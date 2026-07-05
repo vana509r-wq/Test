@@ -1,0 +1,250 @@
+-- [[ ЗАГРУЗКА КРАСИВОЙ БИБЛИОТЕКИ ИНТЕРФЕЙСА FLUENT ]]
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+-- [[ НАСТРОЙКИ СКРИПТА ПО УМОЛЧАНИЮ ]]
+local Config = {
+WalkSpeed = 16,
+SpeedEnabled = false,
+FlyEnabled = false,
+FlySpeed = 50,
+FlingEnabled = false,
+ESPEnabled = false,
+ESPColorName = "Зеленый"
+}
+-- [[ ЦВЕТОВАЯ ПАЛИТРА ДЛЯ ВХ ]]
+local Colors = {
+["Красный"] = Color3.fromRGB(255, 40, 40),
+["Зеленый"] = Color3.fromRGB(40, 255, 40),
+["Синий"]   = Color3.fromRGB(40, 120, 255)
+}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+-- [[ ИНИЦИАЛИЗАЦИЯ КРАСИВОГО ОКНА ]]
+local Window = Fluent:CreateWindow({
+Title = "Aether Hub",
+SubTitle = "Mobile Edition",
+TabWidth = 140,
+Size = UDim2.fromOffset(560, 380),
+Acrylic = true, -- Красивое полупрозрачное размытие фона
+Theme = "Dark", -- Темная современная тема
+MinimizeKey = Enum.KeyCode.LeftControl -- Кнопка сворачивания (для ПК версии)
+})
+-- Создаем вкладки с красивыми иконками (Lucide Icons)
+local Tabs = {
+Main = Window:AddTab({ Title = "Инфо", Icon = "info" }),
+Movement = Window:AddTab({ Title = "Движение", Icon = "activity" }),
+Visuals = Window:AddTab({ Title = "Визуалы", Icon = "eye" }),
+Troll = Window:AddTab({ Title = "Вредитель", Icon = "zap" })
+}
+-- Уведомление о успешном запуске меню
+Fluent:Notify({
+Title = "Aether Hub",
+Content = "Скрипт успешно запущен! Наслаждайтесь игрой.",
+Duration = 5
+})
+-- [[ ВКЛАДКА: ИНФО ]]
+Tabs.Main:AddParagraph({
+Title = "Добро пожаловать в Aether Hub",
+Content = "Это приватное мульти-хак меню, полностью оптимизированное под мобильные телефоны и слабые устройства.\nРазработчик: Gemini AI"
+})
+-- [[ ЛОГИКА ФУНКЦИЙ ]]
+-- 1. Спидхак (SpeedHack)
+RunService.RenderStepped:Connect(function()
+if Config.SpeedEnabled and LP.Character and LP.Character:FindFirstChild("Humanoid") then
+LP.Character.Humanoid.WalkSpeed = Config.WalkSpeed
+end
+end)
+-- 2. Полет (Fly)
+local flyBV, flyBG, flyConnection
+local function handleFly()
+if Config.FlyEnabled then
+local char = LP.Character
+if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+local hrp = char.HumanoidRootPart
+local hum = char:FindFirstChildOfClass("Humanoid")
+-- Удаляем старые векторы, если они остались
+if hrp:FindFirstChild("FlyBV") then hrp.FlyBV:Destroy() end
+if hrp:FindFirstChild("FlyBG") then hrp.FlyBG:Destroy() end
+flyBV = Instance.new("BodyVelocity")
+flyBV.Name = "FlyBV"
+flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+flyBV.Velocity = Vector3.new(0, 0, 0)
+flyBV.Parent = hrp
+flyBG = Instance.new("BodyGyro")
+flyBG.Name = "FlyBG"
+flyBG.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+flyBG.CFrame = hrp.CFrame
+flyBG.Parent = hrp
+flyConnection = RunService.RenderStepped:Connect(function()
+if not Config.FlyEnabled or not char or not hrp.Parent then
+if flyBV then flyBV:Destroy() end
+if flyBG then flyBG:Destroy() end
+if flyConnection then flyConnection:Disconnect() end
+return
+end
+local cam = workspace.CurrentCamera
+if hum.MoveDirection.Magnitude > 0 then
+flyBV.Velocity = cam.CFrame:VectorToWorldSpace(Vector3.new(hum.MoveDirection.X, 0, -hum.MoveDirection.Z).Unit * Config.FlySpeed)
+else
+flyBV.Velocity = Vector3.new(0, 0, 0)
+end
+flyBG.CFrame = cam.CFrame
+end)
+else
+if flyConnection then flyConnection:Disconnect() end
+local char = LP.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if hrp then
+if hrp:FindFirstChild("FlyBV") then hrp.FlyBV:Destroy() end
+if hrp:FindFirstChild("FlyBG") then hrp.FlyBG:Destroy() end
+end
+end
+end
+-- 3. ВХ (ESP) через Highlight
+local function applyESP(player)
+if player == LP then return end
+local function setupHighlight(char)
+if not char then return end
+task.wait(0.3) -- Задержка для полной прогрузки персонажа
+local highlight = char:FindFirstChild("AetherESP") or Instance.new("Highlight")
+highlight.Name = "AetherESP"
+highlight.FillColor = Colors[Config.ESPColorName] or Color3.fromRGB(0, 255, 0)
+highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+highlight.FillTransparency = 0.4
+highlight.OutlineTransparency = 0.1
+highlight.Enabled = Config.ESPEnabled
+highlight.Adornee = char
+highlight.Parent = char
+end
+if player.Character then setupHighlight(player.Character) end
+player.CharacterAdded:Connect(setupHighlight)
+end
+local function updateAllESP()
+for _, p in pairs(Players:GetPlayers()) do
+if p ~= LP and p.Character then
+local hl = p.Character:FindFirstChild("AetherESP")
+if hl then
+hl.Enabled = Config.ESPEnabled
+hl.FillColor = Colors[Config.ESPColorName]
+elseif Config.ESPEnabled then
+applyESP(p)
+end
+end
+end
+end
+Players.PlayerAdded:Connect(applyESP)
+-- 4. Флинг (Fling) — мощная крутилка, которая выталкивает игроков
+local flingConnection
+local function handleFling()
+if Config.FlingEnabled then
+flingConnection = RunService.Heartbeat:Connect(function()
+if not Config.FlingEnabled then
+if flingConnection then flingConnection:Disconnect() end
+return
+end
+local char = LP.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if hrp then
+-- Отключаем коллизию на время флинга, чтобы не улететь самому
+for _, part in pairs(char:GetDescendants()) do
+if part:IsA("BasePart") then
+part.CanCollide = false
+end
+end
+-- Бешеное ускорение по осям для флинга
+hrp.Velocity = Vector3.new(45000, 45000, 45000)
+local bav = hrp:FindFirstChild("FlingSpin") or Instance.new("BodyAngularVelocity", hrp)
+bav.Name = "FlingSpin"
+bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+bav.AngularVelocity = Vector3.new(0, 45000, 0)
+end
+end)
+else
+if flingConnection then flingConnection:Disconnect() end
+local char = LP.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if hrp and hrp:FindFirstChild("FlingSpin") then
+hrp.FlingSpin:Destroy()
+end
+end
+end
+-- [[ НАСТРОЙКА КНОПОК И ЭЛЕМЕНТОВ В МЕНЮ ]]
+-- ВКЛАДКА: ДВИЖЕНИЕ
+Tabs.Movement:AddToggle("SpeedToggle", {
+Title = "Включить Спидхак",
+Default = false,
+Callback = function(Value)
+Config.SpeedEnabled = Value
+if not Value and LP.Character and LP.Character:FindFirstChild("Humanoid") then
+LP.Character.Humanoid.WalkSpeed = 16 -- Сброс скорости до базовой
+end
+end
+})
+Tabs.Movement:AddSlider("SpeedSlider", {
+Title = "Скорость бега",
+Description = "Стандартная скорость — 16",
+Default = 16,
+Min = 16,
+Max = 250,
+Rounding = 0,
+Callback = function(Value)
+Config.WalkSpeed = Value
+end
+})
+Tabs.Movement:AddDivider()
+Tabs.Movement:AddToggle("FlyToggle", {
+Title = "Включить Полет (Fly)",
+Default = false,
+Callback = function(Value)
+Config.FlyEnabled = Value
+handleFly()
+end
+})
+Tabs.Movement:AddSlider("FlySpeedSlider", {
+Title = "Скорость полета",
+Default = 50,
+Min = 10,
+Max = 250,
+Rounding = 0,
+Callback = function(Value)
+Config.FlySpeed = Value
+end
+})
+-- ВКЛАДКА: ВИЗУАЛЫ (ВХ)
+Tabs.Visuals:AddToggle("ESPToggle", {
+Title = "Включить ВХ (ESP Highlight)",
+Default = false,
+Callback = function(Value)
+Config.ESPEnabled = Value
+updateAllESP()
+end
+})
+Tabs.Visuals:AddDropdown("ESPColorDropdown", {
+Title = "Цвет подсветки ВХ",
+Values = {"Зеленый", "Красный", "Синий"},
+CurrentValue = "Зеленый",
+Callback = function(Value)
+Config.ESPColorName = Value
+updateAllESP()
+end
+})
+-- ВКЛАДКА: ВРЕДИТЕЛЬ (FLING)
+Tabs.Troll:AddToggle("FlingToggle", {
+Title = "Активный Флинг",
+Description = "Включает дикую крутилку персонажа. Просто подбеги к игроку вплотную, чтобы запустить его в космос!",
+Default = false,
+Callback = function(Value)
+Config.FlingEnabled = Value
+handleFling()
+end
+})
+-- Первичный запуск ВХ для тех, кто уже на сервере
+for _, p in pairs(Players:GetPlayers()) do
+applyESP(p)
+end
+-- Автоматическое переподключение функций при респавне персонажа
+LP.CharacterAdded:Connect(function()
+task.wait(1)
+if Config.FlyEnabled then handleFly() end
+if Config.FlingEnabled then handleFling() end
+end)
