@@ -1,0 +1,68 @@
+-- Упрощенная и стабильная версия для мобильных устройств
+local player = game:GetService("Players").LocalPlayer
+local mouse = player:GetMouse()
+local runService = game:GetService("RunService")
+
+-- Создаем GUI
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui") or player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "honeylua"
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -125)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Можно двигать пальцем
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "honeylua"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Кнопки
+local function createButton(name, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0, MainFrame.Size.Y.Offset + 5)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- Переменные состояний
+_G.Speed = 16
+_G.Fly = false
+
+-- Функции
+createButton("Спидхак (ON/OFF)", function()
+    _G.Speed = (_G.Speed == 16) and 50 or 16
+end)
+
+createButton("Полет (Fly)", function()
+    _G.Fly = not _G.Fly
+end)
+
+-- Цикл функций
+runService.RenderStepped:Connect(function()
+    local char = player.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = _G.Speed
+        
+        if _G.Fly and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0) -- Простой полет вверх
+        end
+    end
+end)
+
+-- Кнопка скрытия (чтобы не закрывался скрипт)
+local HideBtn = Instance.new("TextButton", ScreenGui)
+HideBtn.Size = UDim2.new(0, 50, 0, 50)
+HideBtn.Position = UDim2.new(0, 10, 0, 10)
+HideBtn.Text = "MENU"
+HideBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+HideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
