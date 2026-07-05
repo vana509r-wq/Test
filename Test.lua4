@@ -1,0 +1,52 @@
+-- [[ УЛЬТРА-ЛЕГКИЙ MM2 ESP ]] --
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local function getRole(player)
+    -- Проверяем наличие предметов в рюкзаке или руках
+    local char = player.Character
+    if player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) then
+        return "Murderer"
+    elseif player.Backpack:FindFirstChild("Gun") or (char and char:FindFirstChild("Gun")) then
+        return "Sheriff"
+    end
+    return "Innocent"
+end
+
+local function applyESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer and player.Character then
+            local char = player.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            
+            -- Удаляем старое, чтобы не дублировать
+            if char:FindFirstChild("ESP_BOX") then char.ESP_BOX:Destroy() end
+            
+            if hrp then
+                local role = getRole(player)
+                if role ~= "Innocent" then -- Подсвечиваем только опасные роли
+                    local box = Instance.new("BoxHandleAdornment")
+                    box.Name = "ESP_BOX"
+                    box.Adornee = hrp
+                    box.Size = Vector3.new(4, 5, 4)
+                    box.AlwaysOnTop = true
+                    box.ZIndex = 5
+                    box.Transparency = 0.3
+                    box.Color3 = (role == "Murderer" and Color3.new(1, 0, 0)) or Color3.new(0, 0, 1)
+                    box.Parent = char
+                end
+            end
+        end
+    end
+end
+
+-- Обновляем каждую секунду
+task.spawn(function()
+    while true do
+        applyESP()
+        task.wait(1)
+    end
+end)
+
+print("ESP загружен! Мардеры и Шерифы будут подсвечены.")
