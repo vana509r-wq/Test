@@ -1,0 +1,169 @@
+-- [[ MM2 МОБИЛЬНЫЙ СКРИПТ: ПОЛЕТ + РОЛИ ВХ ]] --
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- НАСТРОЙКИ
+local FLYSPEED = 40   
+
+-- Состояния
+local flyEnabled = false
+local espEnabled = false
+local flyUp = false
+local flyDown = false
+
+local bodyGyro, bodyVelocity
+
+----------------------------------------------------------------
+-- СОЗДАНИЕ ИНТЕРФЕЙСА (GUI)
+----------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "MM2_MobileMenu"
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Главный фрейм
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 190)
+MainFrame.Position = UDim2.new(0.5, -100, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Заголовок
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(50, 30, 30) -- Темно-красный стиль MM2
+Title.Text = "MM2 CHEATS"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Кнопка "M" для скрытия меню
+local ToggleMenuBtn = Instance.new("TextButton")
+ToggleMenuBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleMenuBtn.Position = UDim2.new(0.05, 0, 0.05, 0)
+ToggleMenuBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 30)
+ToggleMenuBtn.Text = "M"
+ToggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleMenuBtn.Font = Enum.Font.SourceSansBold
+ToggleMenuBtn.TextSize = 22
+ToggleMenuBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1, 0)
+ToggleCorner.Parent = ToggleMenuBtn
+
+ToggleMenuBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Сенсорные кнопки полета (Вверх/Вниз)
+local FlyControls = Instance.new("Frame")
+FlyControls.Size = UDim2.new(0, 60, 0, 130)
+FlyControls.Position = UDim2.new(0.85, 0, 0.5, -65)
+FlyControls.BackgroundTransparency = 1
+FlyControls.Visible = false
+FlyControls.Parent = ScreenGui
+
+local UpBtn = Instance.new("TextButton")
+UpBtn.Size = UDim2.new(1, 0, 0, 55)
+UpBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+UpBtn.Text = "▲"
+UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpBtn.TextSize = 24
+UpBtn.Parent = FlyControls
+Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(0, 8)
+
+local DownBtn = Instance.new("TextButton")
+DownBtn.Size = UDim2.new(1, 0, 0, 55)
+DownBtn.Position = UDim2.new(0, 0, 1, -55)
+DownBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+DownBtn.Text = "▼"
+DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+DownBtn.TextSize = 24
+DownBtn.Parent = FlyControls
+Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(0, 8)
+
+UpBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = true end end)
+UpBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = false end end)
+DownBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = true end end)
+DownBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = false end end)
+
+-- Конструктор кнопок
+local function createButton(text, yPos, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 160, 0, 45)
+    button.Position = UDim2.new(0, 20, 0, yPos)
+    button.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 15
+    button.Parent = MainFrame
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+    button.MouseButton1Click:Connect(callback)
+    return button
+end
+
+----------------------------------------------------------------
+-- ФУНКЦИОНАЛ: ПОЛЕТ
+----------------------------------------------------------------
+local FlyBtn
+local function startFly()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local torso = character:WaitForChild("HumanoidRootPart")
+    
+    bodyGyro = Instance.new("BodyGyro", torso)
+    bodyGyro.P = 9e4
+    bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bodyGyro.cframe = torso.CFrame
+    
+    bodyVelocity = Instance.new("BodyVelocity", torso)
+    bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+    bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+    
+    task.spawn(function()
+        while flyEnabled and character:IsDescendantOf(workspace) do
+            RunService.RenderStepped:Wait()
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                local moveDirection = humanoid.MoveDirection
+                local cameraCFrame = Camera.CFrame
+                
+                local flyDir = Vector3.new(0,0,0)
+                if moveDirection.Magnitude > 0 then
+                    flyDir = cameraCFrame:VectorToWorldSpace(Vector3.new(moveDirection.X, 0, moveDirection.Z)).Unit * FLYSPEED
+                end
+                
+                local vertical = 0
+                if flyUp then vertical = FLYSPEED 
+                elseif flyDown then vertical = -FLYSPEED end
+                
+                bodyVelocity.velocity = Vector3.new(flyDir.X, vertical == 0 and flyDir.Y or vertical, flyDir.Z)
+                bodyGyro.cframe = cameraCFrame
+            end
+        end
+    end)
+end
+
+local function toggleFly()
+    flyEnabled = not flyEnabled
+    if flyEnabled then
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(46, 2
