@@ -1,0 +1,268 @@
+-- [[ МОБИЛЬНАЯ ВЕРСИЯ С КНОПКОЙ И СЕНСОРНЫМ УПРАВЛЕНИЕМ ]] --
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- НАСТРОЙКИ
+local HIGHSPEED = 100 
+local FLYSPEED = 50   
+
+-- Состояния
+local speedEnabled = false
+local flyEnabled = false
+local espEnabled = false
+local flyUp = false
+local flyDown = false
+
+local bodyGyro, bodyVelocity
+
+----------------------------------------------------------------
+-- СОЗДАНИЕ ИНТЕРФЕЙСА (GUI)
+----------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "MobileModMenu"
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Главный фрейм меню
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Position = UDim2.new(0.5, -100, 0.3, 0) -- По центру экрана
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = true
+MainFrame.Active = true
+MainFrame.Draggable = true -- Можно двигать пальцем
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Заголовок
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Title.Text = "MOBILE MENU"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- КНОПКА СВЕРНУТЬ/РАЗВЕРНУТЬ (Для телефона)
+local ToggleMenuBtn = Instance.new("TextButton")
+ToggleMenuBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleMenuBtn.Position = UDim2.new(0.05, 0, 0.05, 0) -- В левом верхнем углу экрана
+ToggleMenuBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+ToggleMenuBtn.Text = "M"
+ToggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleMenuBtn.Font = Enum.Font.SourceSansBold
+ToggleMenuBtn.TextSize = 22
+ToggleMenuBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1, 0) -- Круглая кнопка
+ToggleCorner.Parent = ToggleMenuBtn
+
+ToggleMenuBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Создание сенсорных кнопок для полета (Вверх/Вниз)
+local FlyControls = Instance.new("Frame")
+FlyControls.Size = UDim2.new(0, 60, 0, 130)
+FlyControls.Position = UDim2.new(0.85, 0, 0.5, -65) -- Справа возле кнопок прыжка
+FlyControls.BackgroundTransparency = 1
+FlyControls.Visible = false
+FlyControls.Parent = ScreenGui
+
+local UpBtn = Instance.new("TextButton")
+UpBtn.Size = UDim2.new(1, 0, 0, 55)
+UpBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+UpBtn.Text = "▲"
+UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UpBtn.TextSize = 24
+UpBtn.Parent = FlyControls
+Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(0, 8)
+
+local DownBtn = Instance.new("TextButton")
+DownBtn.Size = UDim2.new(1, 0, 0, 55)
+DownBtn.Position = UDim2.new(0, 0, 1, -55)
+DownBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+DownBtn.Text = "▼"
+DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+DownBtn.TextSize = 24
+DownBtn.Parent = FlyControls
+Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(0, 8)
+
+-- Логика зажатия кнопок высоты
+UpBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = true end end)
+UpBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = false end end)
+DownBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = true end end)
+DownBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = false end end)
+
+-- Конструктор обычных кнопок в меню
+local function createButton(text, yPos, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 160, 0, 40)
+    button.Position = UDim2.new(0, 20, 0, yPos)
+    button.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 15
+    button.Parent = MainFrame
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+    button.MouseButton1Click:Connect(callback)
+    return button
+end
+
+----------------------------------------------------------------
+-- ФУНКЦИОНАЛ
+----------------------------------------------------------------
+
+-- 1. СКОРОСТЬ
+local SpeedBtn
+local function toggleSpeed()
+    speedEnabled = not speedEnabled
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    
+    if speedEnabled then
+        if humanoid then humanoid.WalkSpeed = HIGHSPEED end
+        SpeedBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        SpeedBtn.Text = "SPEED: ON"
+    else
+        if humanoid then humanoid.WalkSpeed = 16 end
+        SpeedBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        SpeedBtn.Text = "SPEED: OFF"
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if speedEnabled then char:WaitForChild("Humanoid").WalkSpeed = HIGHSPEED end
+end)
+
+-- 2. ПОЛЕТ (Мобильный)
+local FlyBtn
+local function startFly()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local torso = character:WaitForChild("HumanoidRootPart")
+    
+    bodyGyro = Instance.new("BodyGyro", torso)
+    bodyGyro.P = 9e4
+    bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bodyGyro.cframe = torso.CFrame
+    
+    bodyVelocity = Instance.new("BodyVelocity", torso)
+    bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+    bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+    
+    task.spawn(function()
+        while flyEnabled and character:IsDescendantOf(workspace) do
+            RunService.RenderStepped:Wait()
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                local moveDirection = humanoid.MoveDirection
+                local cameraCFrame = Camera.CFrame
+                
+                -- Полет по вектору движения мобильного джойстика
+                local flyDir = Vector3.new(0,0,0)
+                if moveDirection.Magnitude > 0 then
+                    flyDir = cameraCFrame:VectorToWorldSpace(Vector3.new(
+                        moveDirection.X, 
+                        0, 
+                        moveDirection.Z
+                    )).Unit * FLYSPEED
+                end
+                
+                -- Высота с сенсорных стрелочек
+                local vertical = 0
+                if flyUp then vertical = FLYSPEED 
+                elseif flyDown then vertical = -FLYSPEED end
+                
+                bodyVelocity.velocity = Vector3.new(flyDir.X, vertical == 0 and flyDir.Y or vertical, flyDir.Z)
+                bodyGyro.cframe = cameraCFrame
+            end
+        end
+    end)
+end
+
+local function toggleFly()
+    flyEnabled = not flyEnabled
+    if flyEnabled then
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        FlyBtn.Text = "FLY: ON"
+        FlyControls.Visible = true
+        startFly()
+    else
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        FlyBtn.Text = "FLY: OFF"
+        FlyControls.Visible = false
+        if bodyGyro then bodyGyro:Destroy() end
+        if bodyVelocity then bodyVelocity:Destroy() end
+    end
+end
+
+-- 3. ВХ (ESP)
+local EspBtn
+local function applyESP(player)
+    if player == LocalPlayer then return end
+    
+    local function addHighlight(character)
+        if not character then return end
+        if character:FindFirstChild("ESPHighlight") then character.ESPHighlight:Destroy() end
+        
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESPHighlight"
+        highlight.FillColor = Color3.fromRGB(255, 0, 100)
+        highlight.FillTransparency = 0.4
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.Adornee = character
+        highlight.Parent = character
+        highlight.Enabled = espEnabled
+    end
+    
+    addHighlight(player.Character)
+    player.CharacterAdded:Connect(addHighlight)
+end
+
+local function toggleESP()
+    espEnabled = not espEnabled
+    if espEnabled then
+        EspBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        EspBtn.Text = "ESP (WH): ON"
+    else
+        EspBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        EspBtn.Text = "ESP (WH): OFF"
+    end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("ESPHighlight") then
+            player.Character.ESPHighlight.Enabled = espEnabled
+        elseif espEnabled then
+            applyESP(player)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(applyESP)
+for _, player in ipairs(Players:GetPlayers()) do applyESP(player) end
+
+----------------------------------------------------------------
+-- ИНИЦИАЛИЗАЦИЯ КНОПОК ИНТЕРФЕЙСА
+----------------------------------------------------------------
+SpeedBtn = createButton("SPEED: OFF", 60, toggleSpeed)
+FlyBtn = createButton("FLY: OFF", 120, toggleFly)
+EspBtn = createButton("ESP (WH): OFF", 180, toggleESP)
+
+print("[Mobile Menu Loaded] Нажмите круглую кнопку 'M' для скрытия меню.")
