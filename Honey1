@@ -1,0 +1,214 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+-- Создаем интерфейс (совместим со всеми телефонами)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "honeylua_mobile"
+ScreenGui.Parent = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+-- Главное окно
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 260, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Можно двигать пальцем по экрану
+
+-- Скругление углов окна
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 12)
+
+-- Шапка меню
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(230, 140, 0) -- Красивый медовый цвет
+Title.Text = "  honeylua v2"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 20
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local TitleCorner = Instance.new("UICorner", Title)
+TitleCorner.CornerRadius = UDim.new(0, 12)
+
+-- Контейнер для кнопок (чтобы они стояли ровно)
+local Container = Instance.new("ScrollingFrame", MainFrame)
+Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Position = UDim2.new(0, 10, 0, 50)
+Container.BackgroundTransparency = 1
+Container.CanvasSize = UDim2.new(0, 0, 0, 360)
+Container.ScrollBarThickness = 4
+
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Spacing = UDim.new(0, 8)
+
+-- Настройки и переменные читов
+local Config = {
+    SpeedHack = false,
+    SpeedValue = 60,
+    SpeedGlitch = false,
+    Fly = false,
+    FlySpeed = 50,
+    Fling = false,
+    ESP = false
+}
+
+-- Функция для создания красивых переключателей (Toggles)
+local function createToggle(text, configKey, callback)
+    local btn = Instance.new("TextButton", Container)
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.SourceSansScale
+    btn.TextSize = 16
+    
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 6)
+
+    btn.MouseButton1Click:Connect(function()
+        Config[configKey] = not Config[configKey]
+        if Config[configKey] then
+            btn.BackgroundColor3 = Color3.fromRGB(230, 140, 0)
+            btn.Text = text .. ": ON"
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            btn.Text = text .. ": OFF"
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        if callback then callback(Config[configKey]) end
+    end)
+end
+
+-- Слайдер скорости (простой переключатель для мобилок)
+local ChangeSpeedBtn = Instance.new("TextButton", Container)
+ChangeSpeedBtn.Size = UDim2.new(1, 0, 0, 35)
+ChangeSpeedBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ChangeSpeedBtn.Text = "Настройка скорости: " .. Config.SpeedValue
+ChangeSpeedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ChangeSpeedBtn.Font = Enum.Font.SourceSans
+ChangeSpeedBtn.TextSize = 14
+Instance.new("UICorner", ChangeSpeedBtn).CornerRadius = UDim.new(0, 6)
+
+ChangeSpeedBtn.MouseButton1Click:Connect(function()
+    if Config.SpeedValue == 60 then Config.SpeedValue = 120
+    elseif Config.SpeedValue == 120 then Config.SpeedValue = 200
+    else Config.SpeedValue = 60 end
+    ChangeSpeedBtn.Text = "Настройка скорости: " .. Config.SpeedValue
+end)
+
+--- [ ДОБАВЛЕНИЕ КНОПОК ФУНКЦИЙ ] ---
+
+createToggle("Спидхак (Speed)", "SpeedHack")
+createToggle("Спид Глитч (Glitch)", "SpeedGlitch")
+createToggle("Полет (Fly)", "Fly")
+createToggle("Флинг (Fling)", "Fling")
+createToggle("ВХ (ESP Boxes)", "ESP")
+
+--- [ ЛОГИКА ФУНКЦИЙ ] ---
+
+-- Хранилище для ВХ коробок
+local espBoxes = {}
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+
+    -- 1. Спидхак
+    if Config.SpeedHack then
+        hum.WalkSpeed = Config.SpeedValue
+    else
+        hum.WalkSpeed = 16
+    end
+
+    -- 2. Спид Глитч (Резкие микро-телепорты вперед при ходьбе)
+    if Config.SpeedGlitch and hum.MoveDirection.Magnitude > 0 then
+        root.CFrame = root.CFrame + (hum.MoveDirection * 0.45)
+    end
+
+    -- 3. Мобильный Fly (Полет туда, куда смотрит камера)
+    if Config.Fly then
+        local vel = Vector3.new(0, 0, 0)
+        if hum.MoveDirection.Magnitude > 0 then
+            vel = hum.MoveDirection * Config.FlySpeed
+        end
+        root.Velocity = vel + Vector3.new(0, 0.4, 0) -- удерживаем в воздухе
+    end
+
+    -- 4. Флинг (Таран игроков физикой)
+    if Config.Fling then
+        root.Velocity = Vector3.new(0, 15000, 0) -- Бешеное вращение осей
+        if char:FindFirstChild("Torso") then char.Torso.CanCollide = false
+        elseif char:FindFirstChild("UpperTorso") then char.UpperTorso.CanCollide = false end
+    end
+end)
+
+-- 5. Логика ВХ (ESP) без внешних библиотек
+local function createESP(player)
+    if player == LocalPlayer then return end
+    
+    local box = Drawing.new("Square")
+    box.Color = Color3.fromRGB(230, 140, 0)
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Visible = false
+    espBoxes[player] = box
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not Config.ESP or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            box.Visible = false
+            if not player.Parent then 
+                box:Destroy()
+                conn:Disconnect()
+            end
+            return
+        end
+
+        local root = player.Character.HumanoidRootPart
+        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+
+        if onScreen then
+            local sizeY = 2500 / pos.Z
+            local sizeX = 1700 / pos.Z
+            box.Size = Vector2.new(sizeX, sizeY)
+            box.Position = Vector2.new(pos.X - sizeX / 2, pos.Y - sizeY / 2)
+            box.Visible = true
+        else
+            box.Visible = false
+        end
+    end)
+end
+
+Players.PlayerAdded:Connect(createESP)
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+
+--- [ ПЛАВАЮЩАЯ КНОПКА HONEY ] ---
+
+local ToggleGui = Instance.new("ScreenGui", ScreenGui.Parent)
+local HoneyBtn = Instance.new("TextButton", ToggleGui)
+HoneyBtn.Size = UDim2.new(0, 55, 0, 55)
+HoneyBtn.Position = UDim2.new(0, 15, 0, 140)
+HoneyBtn.BackgroundColor3 = Color3.fromRGB(230, 140, 0)
+HoneyBtn.Text = "honey"
+HoneyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HoneyBtn.Font = Enum.Font.SourceSansBold
+HoneyBtn.TextSize = 16
+HoneyBtn.Active = true
+HoneyBtn.Draggable = true
+
+local BtnCorner = Instance.new("UICorner", HoneyBtn)
+BtnCorner.CornerRadius = UDim.new(0, 30)
+
+-- Нажатие на кнопку скрывает меню, но ВСЕ читы продолжают работать!
+HoneyBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
