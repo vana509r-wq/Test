@@ -1,0 +1,219 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Создаем окно
+local Window = Fluent:CreateWindow({
+    Title = "honeylua",
+    SubTitle = "Mobile Premium",
+    TabWidth = 140,
+    Size = UDim2.fromOffset(500, 320),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl -- Для ПК (на всякий случай)
+})
+
+-- Создаем красивую плавающую кнопку для мобилок (чтобы скрывать/открывать меню)
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "honeylua_Toggle"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0) -- Красивый медовый/оранжевый цвет
+ToggleButton.Position = UDim2.new(0, 10, 0, 150) -- Позиция на экране (слева)
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "honey"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 16.00
+ToggleButton.Draggable = true -- Кнопку можно двигать пальцем по экрану
+
+UICorner.CornerRadius = UDim.new(0, 30) -- Делаем круглую кнопку
+UICorner.Parent = ToggleButton
+
+-- Логика скрытия/открытия при нажатии на кнопку
+ToggleButton.MouseButton1Click:Connect(function()
+    if game:GetService("CoreGui")["Fluent"].Enabled then
+        game:GetService("CoreGui")["Fluent"].Enabled = false
+    else
+        game:GetService("CoreGui")["Fluent"].Enabled = true
+    end
+end)
+
+-- Вкладки
+local Tabs = {
+    Main = Window:AddTab({ Title = "Основное", Icon = "home" }),
+    Visuals = Window:AddTab({ Title = "Визуалы", Icon = "eye" }),
+    Settings = Window:AddTab({ Title = "Настройки", Icon = "settings" })
+}
+
+-- Переменные для функций
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local walkSpeed = 16
+local isSpeedHack = false
+local isFly = false
+local flySpeed = 50
+local isSpeedGlitch = false
+local speedGlitchFactor = 5
+local isFling = false
+
+-- Скорость / Спидхак
+Tabs.Main:AddToggle("SpeedToggle", {
+    Title = "Включить Спидхак",
+    Default = false,
+    Callback = function(Value)
+        isSpeedHack = Value
+    end
+})
+
+Tabs.Main:AddSlider("SpeedSlider", {
+    Title = "Скорость бега",
+    Description = "Стандартная — 16",
+    Default = 16,
+    Min = 16,
+    Max = 250,
+    Rounding = 0,
+    Callback = function(Value)
+        walkSpeed = Value
+    end
+})
+
+-- Спид Глитч (Быстрые рывки)
+Tabs.Main:AddToggle("GlitchToggle", {
+    Title = "Speed Glitch (Резкие рывки)",
+    Default = false,
+    Callback = function(Value)
+        isSpeedGlitch = Value
+    end
+})
+
+-- Флай (Полет)
+Tabs.Main:AddToggle("FlyToggle", {
+    Title = "Включить Fly (Полет)",
+    Default = false,
+    Callback = function(Value)
+        isFly = Value
+    end
+})
+
+Tabs.Main:AddSlider("FlySpeedSlider", {
+    Title = "Скорость полета",
+    Default = 50,
+    Min = 20,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        flySpeed = Value
+    end
+})
+
+-- Флинг (Убийство/Расталкивание)
+Tabs.Main:AddToggle("FlingToggle", {
+    Title = "Включить Fling",
+    Description = "Тарань игроков, чтобы запустить их в космос",
+    Default = false,
+    Callback = function(Value)
+        isFling = Value
+    end
+})
+
+-- ВХ (Wallhack / ESP)
+local espBoxes = {}
+Tabs.Visuals:AddToggle("ESPToggle", {
+    Title = "Включить ВХ (ESP Boxes)",
+    Default = false,
+    Callback = function(Value)
+        if not Value then
+            for _, box in pairs(espBoxes) do if box then box:Destroy() end end
+            table.clear(espBoxes)
+        end
+        _G.ESP = Value
+    end
+})
+
+-- Логика циклов функций (работает ВСЕГДА, даже если GUI скрыт)
+RunService.RenderStepped:Connect(function()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return end
+
+    -- Спидхак
+    if isSpeedHack then
+        humanoid.WalkSpeed = walkSpeed
+    end
+
+    -- Speed Glitch
+    if isSpeedGlitch and humanoid.MoveDirection.Magnitude > 0 then
+        rootPart.CFrame = rootPart.CFrame + (humanoid.MoveDirection * (speedGlitchFactor / 10))
+    end
+
+    -- Полет (Fly)
+    if isFly then
+        local targetVelocity = Vector3.new(0, 0, 0)
+        if humanoid.MoveDirection.Magnitude > 0 then
+            targetVelocity = humanoid.MoveDirection * flySpeed
+        end
+        rootPart.Velocity = targetVelocity + Vector3.new(0, 0.5, 0)
+    end
+
+    -- Флинг (Fling)
+    if isFling then
+        rootPart.Velocity = Vector3.new(0, 9999, 0)
+        if character:FindFirstChild("Torso") then
+            character.Torso.CanCollide = false
+        elseif character:FindFirstChild("UpperTorso") then
+            character.UpperTorso.CanCollide = false
+        end
+    end
+end)
+
+-- Логика ВХ (ESP)
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local box = Drawing.new("Square")
+    box.Color = Color3.fromRGB(255, 165, 0)
+    box.Thickness = 2
+    box.Filled = false
+    box.Visible = false
+    table.insert(espBoxes, box)
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not _G.ESP or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            box.Visible = false
+            if not _G.ESP and connection then connection:Disconnect() end
+            return
+        end
+
+        local rootPart = player.Character.HumanoidRootPart
+        local position, onScreen = game.Workspace.CurrentCamera:WorldToViewportPoint(rootPart.Position)
+
+        if onScreen then
+            box.Size = Vector2.new(2000 / position.Z, 3000 / position.Z)
+            box.Position = Vector2.new(position.X - box.Size.X / 2, position.Y - box.Size.Y / 2)
+            box.Visible = true
+        else
+            box.Visible = false
+        end
+    end)
+end
+
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+Players.PlayerAdded:Connect(createESP)
+
+Window:SelectTab(1)
+Fluent:Notify({
+    Title = "honeylua",
+    Content = "Скрипт успешно загружен! Используй кнопку 'honey' для скрытия меню.",
+    Duration = 5
+})
