@@ -1,0 +1,180 @@
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Roblox Mobile Menu [REMAKER]",
+    SubTitle = "by Client",
+    TabWidth = 160,
+    Size = Vector2.new(460, 340),
+    Acrylic = false, -- Отключено для повышения FPS на телефонах
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Функции", Icon = "home" }),
+    Visuals = Window:AddTab({ Title = "Визуалы", Icon = "eye" })
+}
+
+-- Переменные управления
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+
+local Config = {
+    SpeedEnabled = false,
+    SpeedValue = 16,
+    FlyEnabled = false,
+    FlySpeed = 50,
+    FlingEnabled = false,
+    EspEnabled = false,
+    EspColor = Color3.fromRGB(255, 0, 0) -- Красный по умолчанию
+}
+
+-- ==========================================
+-- 1. СТАБИЛЬНЫЙ СПИДХАК
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    if Config.SpeedEnabled and LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = Config.SpeedValue
+    end
+end)
+
+-- ==========================================
+-- 2. МОЩНЫЙ И ВИДИМЫЙ ФЛИНГ (Для телефонов)
+-- ==========================================
+task.spawn(function()
+    while true do
+        task.wait()
+        if Config.FlingEnabled and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LP.Character.HumanoidRootPart
+            
+            -- Пробиваем физику сервера: делаем персонажа «бешеным» для хитбоксов других игроков
+            local oldVelocity = hrp.Velocity
+            hrp.Velocity = Vector3.new(9999, 9999, 9999) -- Огромный импульс
+            
+            -- Вращение, ломающее чужую физику при касании
+            local bav = hrp:FindFirstChildOfClass("BodyAngularVelocity")
+            if not bav then
+                bav = Instance.new("BodyAngularVelocity", hrp)
+                bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            end
+            bav.AngularVelocity = Vector3.new(0, 9999, 0)
+            
+            RunService.Heartbeat:Wait()
+            hrp.Velocity = oldVelocity
+        else
+            if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                local bav = LP.Character.HumanoidRootPart:FindFirstChildOfClass("BodyAngularVelocity")
+                if bav then bav:Destroy() end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 3. РАБОЧИЙ ВХ (ESP ВОКРУГ ИГРОКОВ)
+-- ==========================================
+local function applyESP(player)
+    if player == LP then return end
+
+    local function createESP(char)
+        if not char then return end
+        
+        -- Ждем полной загрузки частей тела, чтобы ВХ не ломался
+        char:WaitForChild("HumanoidRootPart", 5)
+        task.wait(0.5)
+
+        -- Удаляем старый ВХ, если он был
+        if char:FindFirstChild("MobileESP") then char.MobileESP:Destroy() end
+
+        -- Создаем современный Highlight (подсветка сквозь стены)
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "MobileESP"
+        highlight.FillColor = Config.EspColor
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.4
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = char
+        highlight.Enabled = Config.EspEnabled
+        highlight.Parent = char
+    end
+
+    if player.Character then createESP(player.Character) end
+    player.CharacterAdded:Connect(createESP)
+end
+
+-- Функция принудительного обновления ВХ при смене настроек
+local function updateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("MobileESP") then
+            p.Character.MobileESP.Enabled = Config.EspEnabled
+            p.Character.MobileESP.FillColor = Config.EspColor
+        elseif Config.EspEnabled then
+            applyESP(p)
+        end
+    end
+end
+
+-- Авто-подключение для новых игроков
+Players.PlayerAdded:Connect(applyESP)
+for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
+
+
+-- ==========================================
+-- ИНТЕРФЕЙС МЕНЮ (КНОПКИ И ПОЛЗУНКИ)
+-- ==========================================
+
+-- ВКЛАДКА: ОСНОВНЫЕ ФУНКЦИИ
+local SpeedToggle = Tabs.Main:AddToggle("SpeedToggle", {Title = "Включить Спидхак", Default = false})
+SpeedToggle:OnChanged(function(Value)
+    Config.SpeedEnabled = Value
+    if not Value and LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = 16 -- Сброс скорости
+    end
+end)
+
+Tabs.Main:AddSlider("SpeedSlider", {
+    Title = "Скорость бега",
+    Description = "Стандартная скорость — 16",
+    Default = 16,
+    Min = 16,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value) Config.SpeedValue = Value end
+})
+
+local FlingToggle = Tabs.Main:AddToggle("FlingToggle", {
+    Title = "Включить Флинг", 
+    Description = "Включи Спидхак и врежься в игрока в упор!",
+    Default = false
+})
+FlingToggle:OnChanged(function(Value)
+    Config.FlingEnabled = Value
+end)
+
+
+-- ВКЛАДКА: ВИЗУАЛЫ (ВХ)
+local EspToggle = Tabs.Visuals:AddToggle("EspToggle", {Title = "Включить ВХ (ESP)", Default = false})
+EspToggle:OnChanged(function(Value)
+    Config.EspEnabled = Value
+    updateESP()
+end)
+
+local ColorDropdown = Tabs.Visuals:AddDropdown("ColorDropdown", {
+    Title = "Цвет подсветки ВХ",
+    Values = {"Красный", "Зеленый", "Синий"},
+    CurrentValue = "Красный",
+    Callback = function(Value)
+        if Value == "Красный" then Config.EspColor = Color3.fromRGB(255, 0, 0)
+        elseif Value == "Зеленый" then Config.EspColor = Color3.fromRGB(0, 255, 0)
+        elseif Value == "Синий" then Config.EspColor = Color3.fromRGB(0, 0, 255) end
+        updateESP()
+    end
+})
+
+Window:SelectTab(1)
+Fluent:Notify({
+    Title = "Remaker Menu",
+    Content = "Скрипт успешно запущен!",
+    Duration = 5
+})
